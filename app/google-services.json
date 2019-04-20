@@ -1,0 +1,55 @@
+{
+  "project_info": {
+    "project_number": "80226399785",
+    "firebase_url": "https://checkers-fe696.firebaseio.com",
+    "project_id": "checkers-fe696",
+    "storage_bucket": "checkers-fe696.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:80226399785:android:6b3ec2135aa40f38",
+        "android_client_info": {
+          "package_name": "me.checkers"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "80226399785-2kttana7i1fkjfvt8vo9dbu4grnpc290.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "me.checkers",
+            "certificate_hash": "aaff48be227ae176bf68abaa7fe89f9176bd575a"
+          }
+        },
+        {
+          "client_id": "80226399785-rljjsqe8a9rgtv2co7lo1hqfd2jn1bsc.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBkLlhorkVQHFpl35KKUPkCyQd-gfISsRI"
+        }
+      ],
+      "services": {
+        "analytics_service": {
+          "status": 1
+        },
+        "appinvite_service": {
+          "status": 2,
+          "other_platform_oauth_client": [
+            {
+              "client_id": "80226399785-rljjsqe8a9rgtv2co7lo1hqfd2jn1bsc.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        },
+        "ads_service": {
+          "status": 2
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
