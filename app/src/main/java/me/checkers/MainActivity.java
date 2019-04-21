@@ -20,7 +20,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     public boolean firstPlayerTurn;
     public ArrayList<Coordinates> coords = new ArrayList<>();
     public Tile[][] Board = new Tile[8][8];
-    public boolean selected = false;
+    public boolean pieceHasBeenSelected = false;
     public Coordinates lastPos = null;
     public Coordinates clickedPosition = new Coordinates(0,0);
     public TextView game_over;
@@ -30,11 +30,10 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     public Piece lastSelectedPiece;
     public static boolean redTurn;
     public static boolean isOnline;
-
+    public List<Coordinates> lastCaptures;
 
     ArrayList<Piece> redPieces;
     ArrayList<Piece> whitePieces;
-
 
 
     @Override
@@ -51,13 +50,13 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         //initialise values
         redPieces = new ArrayList<>();
         whitePieces = new ArrayList<>();
+        lastCaptures = new ArrayList<>();
         initialiseBoard();
         lastSelectedPiece = null;
         firstPlayerTurn = true;
 
         //initialise FireBase - online only
-        // basicReadWrite();
-
+        // initialiseOnlinePlay();
 
     }
 
@@ -73,12 +72,6 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
     }
 
-
-    // 0 = empty tile
-    // 1 = red man
-    // 2 = red king
-    // 3 = white man
-    // 4 = white king
     private void convertBoardIntoID(){
 
     }
@@ -136,8 +129,10 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         }
 
         numberOfMoves = 0;
-        selected = false;
-        firstPlayerTurn = true;
+        pieceHasBeenSelected = false;
+        if(!isOnline) {
+            firstPlayerTurn = true;
+        }
         setBoard();
     }
 
@@ -183,26 +178,34 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
         Piece selectedPiece = Board[clickedPosition.getX()][clickedPosition.getY()].getPiece();
 
-        if(!selected){
-            if(selectedPiece != null){
-                allowedMoves(selectedPiece, clickedPosition.getX(), clickedPosition.getY());
-                lastSelectedPiece = selectedPiece;
-                lastPos = new Coordinates(clickedPosition.getX(), clickedPosition.getY());
-                selected = true;
+        if(!pieceHasBeenSelected){
+            if(selectedPiece == null
+                    || selectedPiece.isRed() && !firstPlayerTurn
+                    || !selectedPiece.isRed() && firstPlayerTurn){
+                return;
             }
+            lastCaptures = allowedMoves(selectedPiece, clickedPosition.getX(), clickedPosition.getY());
+            lastSelectedPiece = selectedPiece;
+            lastPos = new Coordinates(clickedPosition.getX(), clickedPosition.getY());
+            pieceHasBeenSelected = true;
         }
         else {
-            if(selectedPiece != null){
+            int x = clickedPosition.getX();
+            int y = clickedPosition.getY();
+            int redColor = Color.RED;
+            int blueColor = Color.BLUE;
+
+            ColorDrawable background =
+                    (ColorDrawable) DisplayBoardBackground[x][y].getBackground();
+
+            if(selectedPiece != null ||
+                    (background.getColor() != redColor
+                    && background.getColor() != blueColor)){
                 clearAllowedMoves();
-                selected = false;
+                pieceHasBeenSelected = false;
             }
             else{
-                int x = clickedPosition.getX();
-                int y = clickedPosition.getY();
-                int redColor = Color.RED;
-                int blueColor = Color.BLUE;
-                ColorDrawable background =
-                        (ColorDrawable) DisplayBoardBackground[x][y].getBackground();
+                // movement
                 if(background.getColor() == redColor) {
                     int lx = lastPos.getX();
                     int ly = lastPos.getY();
@@ -211,27 +214,47 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     redPieces.add(lastSelectedPiece);
                     clearAllowedMoves();
                     setBoard();
-                    selected = false;
+                    pieceHasBeenSelected = false;
+                    firstPlayerTurn = !firstPlayerTurn;
                 }
-                else if(background.getColor() == blueColor) {
-                    int lx = lastPos.getX();
-                    int ly = lastPos.getY();
+                // capturing
+                else{
+                    while(lastCaptures.isEmpty()) {
+                        int lx = lastPos.getX();
+                        int ly = lastPos.getY();
+                        Board[x][y].setPiece(lastSelectedPiece);
+                        Board[lx][ly].removePiece();
 
-                    Board[x][y].setPiece(lastSelectedPiece);
-                    Board[lx][ly].removePiece();
-                    redPieces.add(lastSelectedPiece);
-                    clearAllowedMoves();
-                    setBoard();
-                    selected = false;
+                        if (lx < x && ly > y) {
+                            Board[x - 1][y + 1].removePiece();
+                        } else if (lx > x && ly < y) {
+                            Board[x + 1][y - 1].removePiece();
+                        } else if (lx > x && ly > y) {
+                            Board[x + 1][y + 1].removePiece();
+                        } else if (lx < x && ly < y) {
+                            Board[x - 1][y - 1].removePiece();
+                        }
+
+                        redPieces.add(lastSelectedPiece);
+
+
+                        clearAllowedMoves();
+                        setBoard();
+
+                        lastCaptures = allowedMoves(lastSelectedPiece, x, y);
+                    }
+                    pieceHasBeenSelected = false;
                 }
             }
-
         }
-
-        //setBoard();
     }
 
-    public void allowedMoves(Piece piece, int px, int py){
+    //todo
+    public List<Coordinates> furtherCaptures(){
+        return new ArrayList<>();
+    }
+
+    public List<Coordinates> allowedMoves(Piece piece, int px, int py){
         if(!piece.isKing() && piece.isRed()){
             //mandatory capturing
             List<Coordinates> captures = canCapture(piece, px, py);
@@ -240,6 +263,8 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     DisplayBoardBackground[coord.getX()][coord.getY()]
                             .setBackgroundResource(R.color.colorBoardCaptureSelect);
                 }
+                //todo: test capture return
+                return captures;
             }
             //no capturing
             else {
@@ -280,6 +305,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 } catch (IndexOutOfBoundsException ignored) { }
             }
         }
+        return new ArrayList<>(); //empty return in all other cases
     }
 
     public List<Coordinates> canCapture(Piece piece, int px, int py){
@@ -320,7 +346,6 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             }
             catch (IndexOutOfBoundsException ignored) {}
         }
-
         return result;
     }
 
