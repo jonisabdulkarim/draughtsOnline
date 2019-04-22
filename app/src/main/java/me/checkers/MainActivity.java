@@ -255,16 +255,18 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     redPieces.add(lastSelectedPiece);
                     clearAllowedMoves();
                     setBoard();
-                    pieceHasBeenSelected = false;
-                    firstPlayerTurn = !firstPlayerTurn;
+
+                    if(canCapture(lastSelectedPiece, x, y).isEmpty()){
+                        pieceHasBeenSelected = false;
+                        firstPlayerTurn = !firstPlayerTurn;
+                    }
+                    else{
+                        allowedMoves(lastSelectedPiece, x, y);
+                        lastPos = new Coordinates(x, y);
+                    }
                 }
             }
         }
-    }
-
-    //todo
-    public List<Coordinates> furtherCaptures(){
-        return new ArrayList<>();
     }
 
     public void allowedMoves(Piece piece, int px, int py){
