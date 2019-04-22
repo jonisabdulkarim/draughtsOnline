@@ -544,7 +544,9 @@
             android:elevation="1dp"
             android:longClickable="false"
             android:onClick="onClick"
-            android:focusable="true" />
+            android:focusable="true"
+            tools:ignore="TooManyViews"
+            />
 
         <TextView
             android:id="@+id/R41"

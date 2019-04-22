@@ -37,7 +37,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     ArrayList<Piece> redPieces;
     ArrayList<Piece> whitePieces;
 
-
+    // This method
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         //create instance and set view
@@ -55,6 +55,9 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         initialiseBoard();
         lastSelectedPiece = null;
         firstPlayerTurn = true;
+
+        game_over = findViewById(R.id.game_over);
+        game_over.setVisibility(View.INVISIBLE);
 
         //initialise FireBase - online only
         // initialiseOnlinePlay();
@@ -279,6 +282,11 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     setBoard();
                 }
             }
+        }
+
+        char status = checkForWin();
+        if(status != '0'){
+            game_over.setVisibility(View.VISIBLE);
         }
     }
 
@@ -519,5 +527,35 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 else DisplayBoardBackground[x][y].setBackgroundResource(R.color.colorBoardGreen);
             }
         }
+    }
+
+    public char checkForWin(){
+        int redPieceCount = 0;
+        int whitePieceCount = 0;
+        for (Tile[] tiles : Board) {
+            for (Tile tile : tiles) {
+                if (tile.hasPiece()) {
+                    if (tile.getPiece().isRed()) {
+                        redPieceCount++;
+                    } else if (!tile.getPiece().isRed()) {
+                        whitePieceCount++;
+                    }
+                }
+            }
+        }
+
+        // WIN status
+        // No win = 0
+        // Red win = 1
+        // White win = 2
+        if(redPieceCount == 0){
+            Log.d("whiwin", "true");
+            return '2';
+        }
+        else if(whitePieceCount == 0){
+            Log.d("redwin", "true");
+            return '1';
+        }
+        return '0';
     }
 }
