@@ -12,9 +12,9 @@ import android.widget.TextView;
 import android.util.Log;  // for commenting
 
 // Java imports
-import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
@@ -89,31 +89,28 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             }
         }
 
-        for (Piece piece : whitePieces) {
-            for (int y = 0; y < 3; y++) {
-                for (int x = 0; x < 8; x += 2) {
-                    if (y % 2 == 0) {
-                        try {
-                            Board[x + 1][y].setPiece(piece);
-                        } catch (ArrayIndexOutOfBoundsException ignored) { }
-                    } else {
-                        Board[x][y].setPiece(piece);
-                    }
+        Iterator<Piece> whiteIt = whitePieces.iterator();
+        for (int y = 0; y < 3; y++) {
+            for (int x = 0; x < 8; x += 2) {
+                if (y % 2 == 0) {
+                    try {
+                        Board[x + 1][y].setPiece(whiteIt.next());
+                    } catch (ArrayIndexOutOfBoundsException ignored) { }
+                } else {
+                    Board[x][y].setPiece(whiteIt.next());
                 }
             }
         }
 
-        for (Piece piece : redPieces) {
-            for (int y = 5; y < 8; y++) {
-                for (int x = 0; x < 8; x += 2) {
-                    if (y % 2 == 0) {
-                        try {
-                            Board[x + 1][y].setPiece(piece);
-
-                        } catch (ArrayIndexOutOfBoundsException ignored) { }
-                    } else {
-                        Board[x][y].setPiece(piece);
-                    }
+        Iterator<Piece> redIt = redPieces.iterator();
+        for (int y = 5; y < 8; y++) {
+            for (int x = 0; x < 8; x += 2) {
+                if (y % 2 == 0) {
+                    try {
+                        Board[x + 1][y].setPiece(redIt.next());
+                    } catch (ArrayIndexOutOfBoundsException ignored) { }
+                } else {
+                    Board[x][y].setPiece(redIt.next());
                 }
             }
         }
@@ -145,9 +142,16 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 Piece piece = Board[x][y].getPiece();
 
                 if (Board[x][y].getPiece() != null) {
-                    if (piece.isRed()) {
+                    if (piece.isRed() && !piece.isKing()) {
                         DisplayBoard[x][y].setBackgroundResource(R.drawable.rpawn);
-                    } else {
+                    }
+                    else if(piece.isRed() && piece.isKing()){
+                        DisplayBoard[x][y].setBackgroundResource(R.drawable.rking);
+                    }
+                    else if(!piece.isRed() && piece.isKing()){
+                        DisplayBoard[x][y].setBackgroundResource(R.drawable.wking);
+                    }
+                    else{
                         DisplayBoard[x][y].setBackgroundResource(R.drawable.wpawn);
                     }
                 } else{
@@ -265,6 +269,15 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                         lastPos = new Coordinates(x, y);
                     }
                 }
+                // after move/capture - check for king
+                if(lastSelectedPiece.isRed() && y == 0){
+                    lastSelectedPiece.setKing(true);
+                    setBoard();
+                }
+                else if(!lastSelectedPiece.isRed() && y == 7){
+                    lastSelectedPiece.setKing(true);
+                    setBoard();
+                }
             }
         }
     }
@@ -295,6 +308,43 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 } catch (IndexOutOfBoundsException ignored) { }
             }
         }
+        if(piece.isKing() && piece.isRed()){
+            //mandatory capturing
+            List<Coordinates> captures = canCapture(piece, px, py);
+            if(!captures.isEmpty()){
+                for(Coordinates coord : captures){
+                    DisplayBoardBackground[coord.getX()][coord.getY()]
+                            .setBackgroundResource(R.color.colorBoardCaptureSelect);
+                }
+            }
+            //no capturing
+            else {
+                try {
+                    if (Board[px + 1][py - 1].getPiece() == null) {
+                        DisplayBoardBackground[px + 1][py - 1]
+                                .setBackgroundResource(R.color.colorBoardSelected);
+                    }
+                } catch (IndexOutOfBoundsException ignored) { }
+                try {
+                    if (Board[px - 1][py - 1].getPiece() == null) {
+                        DisplayBoardBackground[px - 1][py - 1]
+                                .setBackgroundResource(R.color.colorBoardSelected);
+                    }
+                } catch (IndexOutOfBoundsException ignored) { }
+                try {
+                    if (Board[px + 1][py + 1].getPiece() == null) {
+                        DisplayBoardBackground[px + 1][py + 1]
+                                .setBackgroundResource(R.color.colorBoardSelected);
+                    }
+                } catch (IndexOutOfBoundsException ignored) { }
+                try {
+                    if (Board[px - 1][py + 1].getPiece() == null) {
+                        DisplayBoardBackground[px - 1][py + 1]
+                                .setBackgroundResource(R.color.colorBoardSelected);
+                    }
+                } catch (IndexOutOfBoundsException ignored) { }
+            }
+        }
         if(!piece.isKing() && !piece.isRed()){
             List<Coordinates> captures = canCapture(piece, px, py);
             if(!captures.isEmpty()){
@@ -318,11 +368,47 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 } catch (IndexOutOfBoundsException ignored) { }
             }
         }
+        if(piece.isKing() && !piece.isRed()){
+            //mandatory capturing
+            List<Coordinates> captures = canCapture(piece, px, py);
+            if(!captures.isEmpty()){
+                for(Coordinates coord : captures){
+                    DisplayBoardBackground[coord.getX()][coord.getY()]
+                            .setBackgroundResource(R.color.colorBoardCaptureSelect);
+                }
+            }
+            //no capturing
+            else {
+                try {
+                    if (Board[px + 1][py - 1].getPiece() == null) {
+                        DisplayBoardBackground[px + 1][py - 1]
+                                .setBackgroundResource(R.color.colorBoardSelected);
+                    }
+                } catch (IndexOutOfBoundsException ignored) { }
+                try {
+                    if (Board[px - 1][py - 1].getPiece() == null) {
+                        DisplayBoardBackground[px - 1][py - 1]
+                                .setBackgroundResource(R.color.colorBoardSelected);
+                    }
+                } catch (IndexOutOfBoundsException ignored) { }
+                try {
+                    if (Board[px + 1][py + 1].getPiece() == null) {
+                        DisplayBoardBackground[px + 1][py + 1]
+                                .setBackgroundResource(R.color.colorBoardSelected);
+                    }
+                } catch (IndexOutOfBoundsException ignored) { }
+                try {
+                    if (Board[px - 1][py + 1].getPiece() == null) {
+                        DisplayBoardBackground[px - 1][py + 1]
+                                .setBackgroundResource(R.color.colorBoardSelected);
+                    }
+                } catch (IndexOutOfBoundsException ignored) { }
+            }
+        }
     }
 
     public Map<Piece, Coordinates> canAnyCapture(){
         Map<Piece, Coordinates> map = new HashMap<>();
-
 
         for (int x = 0; x < 8; x++) {
             for (int y = 0; y < 8; y++) {
@@ -350,7 +436,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
     public List<Coordinates> canCapture(Piece piece, int px, int py){
         ArrayList<Coordinates> result = new ArrayList<>();
-        if(piece.isRed() && !piece.isKing()) {
+        if(piece.isRed()) {
             try {
                 if (Board[px - 1][py - 1].hasPiece()
                         && !Board[px - 1][py - 1].getPiece().isRed()
@@ -367,8 +453,26 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 }
             }
             catch (IndexOutOfBoundsException ignored) {}
+            if(piece.isKing()){
+                try {
+                    if (Board[px - 1][py + 1].hasPiece()
+                            && !Board[px - 1][py + 1].getPiece().isRed()
+                            && !Board[px - 2][py + 2].hasPiece()) {
+                        result.add(new Coordinates(px - 2, py + 2));
+                    }
+                }
+                catch (IndexOutOfBoundsException ignored) {}
+                try{
+                    if (Board[px + 1][py + 1].getPiece() != null
+                            && !Board[px + 1][py + 1].getPiece().isRed()
+                            && !Board[px + 2][py + 2].hasPiece()) {
+                        result.add(new Coordinates(px + 2, py + 2));
+                    }
+                }
+                catch (IndexOutOfBoundsException ignored) {}
+            }
         }
-        else if(!piece.isRed() && !piece.isKing()) {
+        else if(!piece.isRed()) {
             try {
                 if (Board[px - 1][py + 1].hasPiece()
                         && Board[px - 1][py + 1].getPiece().isRed()
@@ -385,6 +489,24 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 }
             }
             catch (IndexOutOfBoundsException ignored) {}
+            if(piece.isKing()){
+                try {
+                    if (Board[px - 1][py - 1].hasPiece()
+                            && Board[px - 1][py - 1].getPiece().isRed()
+                            && !Board[px - 2][py - 2].hasPiece()) {
+                        result.add(new Coordinates(px - 2, py - 2));
+                    }
+                }
+                catch (IndexOutOfBoundsException ignored) {}
+                try{
+                    if (Board[px + 1][py - 1].getPiece() != null
+                            && Board[px + 1][py - 1].getPiece().isRed()
+                            && !Board[px + 2][py - 2].hasPiece()) {
+                        result.add(new Coordinates(px + 2, py - 2));
+                    }
+                }
+                catch (IndexOutOfBoundsException ignored) {}
+            }
         }
         return result;
     }
