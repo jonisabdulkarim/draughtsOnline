@@ -12,8 +12,11 @@ import android.widget.TextView;
 import android.util.Log;  // for commenting
 
 // Java imports
+import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class MainActivity extends AppCompatActivity implements View.OnClickListener {
 
@@ -30,7 +33,6 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     public Piece lastSelectedPiece;
     public static boolean redTurn;
     public static boolean isOnline;
-    public List<Coordinates> lastCaptures;
 
     ArrayList<Piece> redPieces;
     ArrayList<Piece> whitePieces;
@@ -50,7 +52,6 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         //initialise values
         redPieces = new ArrayList<>();
         whitePieces = new ArrayList<>();
-        lastCaptures = new ArrayList<>();
         initialiseBoard();
         lastSelectedPiece = null;
         firstPlayerTurn = true;
@@ -108,6 +109,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     if (y % 2 == 0) {
                         try {
                             Board[x + 1][y].setPiece(piece);
+
                         } catch (ArrayIndexOutOfBoundsException ignored) { }
                     } else {
                         Board[x][y].setPiece(piece);
@@ -181,10 +183,25 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         if(!pieceHasBeenSelected){
             if(selectedPiece == null
                     || selectedPiece.isRed() && !firstPlayerTurn
-                    || !selectedPiece.isRed() && firstPlayerTurn){
+                    || !selectedPiece.isRed() && firstPlayerTurn ){
                 return;
             }
-            lastCaptures = allowedMoves(selectedPiece, clickedPosition.getX(), clickedPosition.getY());
+
+            Map<Piece, Coordinates> canAnyCapture = canAnyCapture();
+            if(!canAnyCapture.isEmpty()) {
+                boolean capturingPiece = false;
+                for(Coordinates coordinates : canAnyCapture.values()){
+                    if(coordinates.getX() == clickedPosition.getX()
+                            && coordinates.getY() == clickedPosition.getY()){
+                        capturingPiece = true;
+                    }
+                }
+                if(!capturingPiece){
+                    return;
+                }
+            }
+
+            allowedMoves(selectedPiece, clickedPosition.getX(), clickedPosition.getY());
             lastSelectedPiece = selectedPiece;
             lastPos = new Coordinates(clickedPosition.getX(), clickedPosition.getY());
             pieceHasBeenSelected = true;
@@ -219,31 +236,27 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 }
                 // capturing
                 else{
-                    while(lastCaptures.isEmpty()) {
-                        int lx = lastPos.getX();
-                        int ly = lastPos.getY();
-                        Board[x][y].setPiece(lastSelectedPiece);
-                        Board[lx][ly].removePiece();
 
-                        if (lx < x && ly > y) {
-                            Board[x - 1][y + 1].removePiece();
-                        } else if (lx > x && ly < y) {
-                            Board[x + 1][y - 1].removePiece();
-                        } else if (lx > x && ly > y) {
-                            Board[x + 1][y + 1].removePiece();
-                        } else if (lx < x && ly < y) {
-                            Board[x - 1][y - 1].removePiece();
-                        }
+                    int lx = lastPos.getX();
+                    int ly = lastPos.getY();
+                    Board[x][y].setPiece(lastSelectedPiece);
+                    Board[lx][ly].removePiece();
 
-                        redPieces.add(lastSelectedPiece);
-
-
-                        clearAllowedMoves();
-                        setBoard();
-
-                        lastCaptures = allowedMoves(lastSelectedPiece, x, y);
+                    if (lx < x && ly > y) {
+                        Board[x - 1][y + 1].removePiece();
+                    } else if (lx > x && ly < y) {
+                        Board[x + 1][y - 1].removePiece();
+                    } else if (lx > x && ly > y) {
+                        Board[x + 1][y + 1].removePiece();
+                    } else if (lx < x && ly < y) {
+                        Board[x - 1][y - 1].removePiece();
                     }
+
+                    redPieces.add(lastSelectedPiece);
+                    clearAllowedMoves();
+                    setBoard();
                     pieceHasBeenSelected = false;
+                    firstPlayerTurn = !firstPlayerTurn;
                 }
             }
         }
@@ -254,7 +267,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         return new ArrayList<>();
     }
 
-    public List<Coordinates> allowedMoves(Piece piece, int px, int py){
+    public void allowedMoves(Piece piece, int px, int py){
         if(!piece.isKing() && piece.isRed()){
             //mandatory capturing
             List<Coordinates> captures = canCapture(piece, px, py);
@@ -263,8 +276,6 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     DisplayBoardBackground[coord.getX()][coord.getY()]
                             .setBackgroundResource(R.color.colorBoardCaptureSelect);
                 }
-                //todo: test capture return
-                return captures;
             }
             //no capturing
             else {
@@ -305,7 +316,34 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 } catch (IndexOutOfBoundsException ignored) { }
             }
         }
-        return new ArrayList<>(); //empty return in all other cases
+    }
+
+    public Map<Piece, Coordinates> canAnyCapture(){
+        Map<Piece, Coordinates> map = new HashMap<>();
+
+
+        for (int x = 0; x < 8; x++) {
+            for (int y = 0; y < 8; y++) {
+                if(firstPlayerTurn
+                        && Board[x][y].getPiece() != null
+                        && Board[x][y].getPiece().isRed()){
+                    List<Coordinates> res = new ArrayList<>(canCapture(Board[x][y].getPiece(), x, y));
+                    if(!res.isEmpty()) {
+                        map.put(Board[x][y].getPiece(), new Coordinates(x, y));
+                    }
+                }
+                else if(!firstPlayerTurn
+                        && Board[x][y].getPiece() != null
+                        && !Board[x][y].getPiece().isRed()){
+                    List<Coordinates> res = new ArrayList<>(canCapture(Board[x][y].getPiece(), x, y));
+                    if(!res.isEmpty()) {
+                        map.put(Board[x][y].getPiece(), new Coordinates(x, y));
+                    }
+                }
+            }
+        }
+
+        return map;
     }
 
     public List<Coordinates> canCapture(Piece piece, int px, int py){
