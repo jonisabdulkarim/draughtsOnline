@@ -11,31 +11,50 @@ import android.view.View;
 import android.widget.TextView;
 import android.util.Log;  // for commenting
 
-// Java imports
+// Firebase imports
+import com.google.android.gms.tasks.OnSuccessListener;
+import com.google.firebase.firestore.DocumentReference;
+import com.google.firebase.firestore.DocumentSnapshot;
+import com.google.firebase.firestore.EventListener;
+import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.FirebaseFirestoreException;
+import com.google.firebase.firestore.QuerySnapshot;
+
+// Java utilities imports
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+
+import javax.annotation.Nullable;
 
 public class MainActivity extends AppCompatActivity implements View.OnClickListener {
 
     public boolean firstPlayerTurn;
-    public ArrayList<Coordinates> coords = new ArrayList<>();
-    public Tile[][] Board = new Tile[8][8];
-    public boolean pieceHasBeenSelected = false;
-    public Coordinates lastPos = null;
-    public Coordinates clickedPosition = new Coordinates(0,0);
+    public boolean pieceHasBeenSelected;
+    public int numberOfMoves;
+    public Coordinates lastPos;
     public TextView game_over;
+    public Piece lastSelectedPiece;
+
+    public Tile[][] Board = new Tile[8][8];
+    public List<List<Integer>> BoardId = new ArrayList<>();
+    public Coordinates clickedPosition = new Coordinates(0,0);
     public TextView[][] DisplayBoard = new TextView[8][8];
     public TextView[][] DisplayBoardBackground = new TextView[8][8];
-    public int numberOfMoves;
-    public Piece lastSelectedPiece;
-    public static boolean redTurn;
+
+    public static boolean isRed;
     public static boolean isOnline;
+    public static String roomId;
+    public static Map<String, Object> roomData;
+    public static int[][] miniBoard;
 
     ArrayList<Piece> redPieces;
     ArrayList<Piece> whitePieces;
+
+    public final FirebaseFirestore db = FirebaseFirestore.getInstance();
 
     // This method
     @Override
@@ -47,37 +66,194 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         //receive intent - online or offline play
         Intent intent = getIntent();
         isOnline = intent.getBooleanExtra(MainMenu.EXTRA_BOOLEAN, false);
-        Log.d("Check online", "Value is: " + isOnline);
 
         //initialise values
         redPieces = new ArrayList<>();
         whitePieces = new ArrayList<>();
         initialiseBoard();
-        lastSelectedPiece = null;
         firstPlayerTurn = true;
+        isRed = true;
+
+        lastSelectedPiece = null;
+        lastPos = null;
+        pieceHasBeenSelected = false;
+        roomId = null;
+        roomData = null;
 
         game_over = findViewById(R.id.game_over);
         game_over.setVisibility(View.INVISIBLE);
 
-        //initialise FireBase - online only
-        // initialiseOnlinePlay();
-
+        //initialise Firebase - online only
+        if(isOnline) {
+            initialiseOnlinePlay();
+            writeBoardId();
+        }
     }
 
     private void initialiseOnlinePlay(){
+        checkForRooms(new MyCallback() {
+            @Override
+            public void onCallback(Map value) {
+                if(roomId == null) {
+                    Log.d("noRoom", "true");
+                    Map<String, Object> newRoomInfo = new HashMap<>();
+                    newRoomInfo.put("status", "half");
+                    Map<String, Object> boardInfo = new HashMap<>();
 
+                    writeBoardId();
+                    for (int x = 0; x < 8; x++) {
+                        boardInfo.put("row" + x, BoardId.get(x));
+                    }
+
+                    DocumentReference ref = db.collection("room").document();
+                    ref.set(newRoomInfo);
+                    roomId = ref.getId();
+
+                    db.collection("room").document(roomId)
+                            .collection("board").document("lastboard")
+                            .set(boardInfo);
+                    isRed = true;
+                }
+                else {
+                    DocumentReference ref = db.collection("room").document(roomId);
+                    ref.update("status", "full");
+                    isRed = false;
+                    listenForChanges();
+                }
+            }
+        });
+    }
+
+    private void checkForRooms(final MyCallback myCallback){
+        db.collection("room").get()
+                .addOnSuccessListener(new OnSuccessListener<QuerySnapshot>() {
+                    @Override
+                    public void onSuccess(QuerySnapshot queryDocumentSnapshots) {
+                        List<DocumentSnapshot> docs = queryDocumentSnapshots.getDocuments();
+                        for(DocumentSnapshot doc : docs) {
+                            if ( Objects.equals(doc.getData().get("status"), "half")) {
+                                roomId = doc.getId();
+                                roomData = doc.getData();
+                                myCallback.onCallback(null);
+                            }
+                        }
+                        myCallback.onCallback(null);
+                    }
+                });
     }
 
     private void sendBoardToOpponent(){
-        
+        Map<String, Object> boardInfo = new HashMap<>();
+        for (int x = 0; x < 8; x++) {
+            boardInfo.put("row" + x, BoardId.get(x));
+        }
+
+        db.collection("room").document(roomId)
+                .collection("board").document("lastboard")
+                .update(boardInfo);
     }
 
-    private void waitAndRetrieve(){
+    private void listenForChanges(){
+        listenerForChanges(new MyCallback() {
+            @Override
+            public void onCallback(Map value) {
+                miniBoard = new int[8][8];
 
+                // Log.d("newboard", "this is the keyset: " + newBoard.keySet());
+                for(int x = 0; x < 8 ; x++) {
+                    List<Long> row = (List<Long>) value.get("row" + x);
+                    for(int y = 0; y < 8; y++){
+                        miniBoard[x][y] = Integer.parseInt(String.valueOf(row.get(y)));
+                    }
+                }
+
+                BoardIdReversor();
+                firstPlayerTurn = !firstPlayerTurn;
+            }
+        });
     }
 
-    private void convertBoardIntoID(){
+    private void listenerForChanges(final MyCallback myCallback){
+        DocumentReference ref = db.collection("room").document(roomId)
+                .collection("board").document("lastboard");
 
+        ref.addSnapshotListener(new EventListener<DocumentSnapshot>() {
+            @Override
+            public void onEvent(@Nullable DocumentSnapshot documentSnapshot,
+                                @Nullable FirebaseFirestoreException e) {
+                if(e != null){
+                    Log.w("Error", "Listen failed.", e);
+                    return;
+                }
+                if(documentSnapshot != null && documentSnapshot.exists()){
+                    myCallback.onCallback(documentSnapshot.getData());
+                    // Log.d("ListenSucc", "Current data: " + documentSnapshot.getData());
+                } else {
+                    Log.d("emptyData", "Current data: null");
+                }
+            }
+        });
+    }
+
+    //converts board with integers
+    //0 = empty tile
+    //1 = red man     2 = red king
+    //3 = white man   4 = white king
+    private void writeBoardId(){
+        //reset boardId
+        BoardId = new ArrayList<List<Integer>>();
+        for(int i = 0; i < 8; i++){
+            BoardId.add(new ArrayList<Integer>());
+        }
+
+        for (int x = 0; x < 8; x++) {
+            for (int y = 0; y < 8; y++) {
+                if(Board[x][y].hasPiece()) {
+                    if (Board[x][y].getPiece().isRed() && !Board[x][y].getPiece().isKing()) {
+                        BoardId.get(x).add(1);
+                    } else if (Board[x][y].getPiece().isRed() && Board[x][y].getPiece().isKing()) {
+                        //BoardId[x][y] = 2;
+                        BoardId.get(x).add(2);
+                    } else if (!Board[x][y].getPiece().isRed() && !Board[x][y].getPiece().isKing()) {
+                        //BoardId[x][y] = 3;
+                        BoardId.get(x).add(3);
+                    } else{
+                        //BoardId[x][y] = 4;
+                        BoardId.get(x).add(4);
+                    }
+                } else{
+                    //BoardId[x][y] = 0;
+                    BoardId.get(x).add(0);
+                }
+            }
+        }
+    }
+
+    private void BoardIdReversor(){
+        for(int x = 0; x < 8; x++){
+            for( int y = 0; y < 8; y++){
+                switch(miniBoard[x][y]){
+                    case 0:
+                        Board[x][y].removePiece();
+                        break;
+                    case 1:
+                        Board[x][y].setPiece(new Piece(true));
+                        break;
+                    case 2:
+                        Board[x][y].setPiece(new Piece(true));
+                        Board[x][y].getPiece().setKing(true);
+                        break;
+                    case 3:
+                        Board[x][y].setPiece(new Piece(false));
+                        break;
+                    case 4:
+                        Board[x][y].setPiece(new Piece(false));
+                        Board[x][y].getPiece().setKing(true);
+                        break;
+                }
+            }
+        }
+        setBoard();
     }
 
     private void initialiseBoard(){
@@ -167,7 +343,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     // Checks location of click and allows for
     // movement of pieces if permitted
     @Override
-    public void onClick(View view){
+    public void onClick(View view) {
         Resources r = getResources();
         String name = getPackageName();
         boolean found = false;
@@ -188,9 +364,10 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         Piece selectedPiece = Board[clickedPosition.getX()][clickedPosition.getY()].getPiece();
 
         if(!pieceHasBeenSelected){
-            if(selectedPiece == null
+            if((selectedPiece == null
                     || selectedPiece.isRed() && !firstPlayerTurn
-                    || !selectedPiece.isRed() && firstPlayerTurn ){
+                    || !selectedPiece.isRed() && firstPlayerTurn)
+                    && !isOnline){
                 return;
             }
 
@@ -224,7 +401,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
             if(selectedPiece != null ||
                     (background.getColor() != redColor
-                    && background.getColor() != blueColor)){
+                            && background.getColor() != blueColor)){
                 clearAllowedMoves();
                 pieceHasBeenSelected = false;
             }
@@ -240,6 +417,11 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     setBoard();
                     pieceHasBeenSelected = false;
                     firstPlayerTurn = !firstPlayerTurn;
+                    if(isOnline){
+                        writeBoardId();
+                        sendBoardToOpponent();
+                        listenForChanges();
+                    }
                 }
                 // capturing
                 else{
@@ -266,6 +448,11 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     if(canCapture(lastSelectedPiece, x, y).isEmpty()){
                         pieceHasBeenSelected = false;
                         firstPlayerTurn = !firstPlayerTurn;
+                        if(isOnline){
+                            writeBoardId();
+                            sendBoardToOpponent();
+                            listenForChanges();
+                        }
                     }
                     else{
                         allowedMoves(lastSelectedPiece, x, y);

@@ -2,4 +2,7 @@
     <string name="app_name">Checkers</string>
     <string name="title_activity_main_menu">MainMenu</string>
     <string name="game_over">Game Over</string>
+    <string name="play_locally">Play Locally</string>
+    <string name="play_online">Play Online</string>
+    <string name="draughts_online">Draughts Online</string>
 </resources>
