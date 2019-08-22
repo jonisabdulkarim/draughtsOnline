@@ -21,7 +21,7 @@ public class MainMenu extends AppCompatActivity {
 
 
     }
-
+//
     public void createOfflineActivity(View view){
         Intent intent = new Intent(this, MainActivity.class);
         intent.putExtra(EXTRA_BOOLEAN, false);
